@@ -1,0 +1,17 @@
+A complete, buildable ASP.NET Core 8 solution — unzip it and open HackerNewsApi.sln in Visual Studio, set HackerNewsApi.Api as startup, and press F5 (Swagger opens at /swagger).
+
+Layout (Api → Application ← Infrastructure, four projects total):
+
+HackerNewsApi.Application — the pure business logic: IStoryService/StoryService (fetch → filter out dead/deleted/titleless → sort by score → take n), IHackerNewsClient abstraction, DTOs. Zero HTTP or caching knowledge.
+HackerNewsApi.Infrastructure — HackerNewsApiClient (real HTTP calls, throttled with a SemaphoreSlim), CachingHackerNewsClient (a Decorator adding caching without touching the HTTP client), MemoryCacheService (per-key locking to prevent cache stampedes), Polly retry + circuit breaker registered on the HttpClient, and an Options-pattern config class.
+HackerNewsApi.Api — a thin StoriesController (GET /api/stories/best/{n}), a global exception-handling middleware, and Program.cs as the IoC composition root (each layer wires itself via its own AddXServices extension).
+HackerNewsApi.Tests — xUnit + Moq unit tests for StoryService, made trivial by DIP (mock IHackerNewsClient, no HTTP or cache needed).
+
+Where each requirement lands:
+
+IoC — constructor injection everywhere, registered in the built-in ASP.NET Core container.
+SOLID — each class has one job (SRP); caching/retry were bolted on as new classes, not edits (OCP); IHackerNewsClient implementations are freely swappable (LSP); interfaces are narrow and consumer-specific (ISP); Application depends only on abstractions it defines, Infrastructure implements them (DIP).
+Other patterns — Decorator (caching), Strategy via Polly policies (retry/circuit-breaker), Options pattern (config), middleware pipeline (cross-cutting error handling).
+Avoiding upstream overload — caching + bounded concurrency + retry/circuit-breaker, detailed in the README.
+
+The README also covers stated assumptions and a prioritized list of enhancements, matching what the test asks the repo to contain.
